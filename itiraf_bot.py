@@ -82,9 +82,7 @@ async def help(_, msg: Message):
 `/limitayarla 5` → Günlük limit 5 olur.
 """
     await msg.reply(metin, quote=True)
-
-@app.on_message(filters.text & ~filters.command(["start"]))
-@app.on_message(filters.text & ~filters.command(["start"]))
+    
 @app.on_message(filters.text & ~filters.command(["start"]))
 async def itiraf_al(_, msg: Message):
     from datetime import time as dtime
@@ -107,38 +105,33 @@ async def itiraf_al(_, msg: Message):
     ad_soyad = (msg.from_user.first_name or "") + (" " + msg.from_user.last_name if msg.from_user.last_name else "")
     kullanici_adi = f"@{msg.from_user.username}" if msg.from_user.username else "(kullanıcı adı yok)"
     kullanici_id = msg.from_user.id
-
     bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {kullanici_id}"
 
-    if gece:
-        if argo_var:
-            mesaj = f"""🌙 *Gece Gelen İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n⚠️ Argo içerik algılandı!\n{bilgi}"""
-            butonlar = InlineKeyboardMarkup([
-                [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
-                 InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
-            ])
-            await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
-            return  # burada bitiyor
+    YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
 
-        else:
-            yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
-            await app.send_message(YAYIN_KANALI, yayin)
+    if gece and not argo_var:
+        # Argo YOK, gece geldi = direkt yayınla
+        yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
+        await app.send_message(YAYIN_KANALI, yayin)
 
-            mesaj = f"""🌙 *Gece Otomatik Yayın*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-            await app.send_message(ONAY_KANALI, mesaj)
+        mesaj = f"""🌙 *Gece Otomatik Yayın*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+        await app.send_message(ONAY_KANALI, mesaj)
 
-            await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢")
-            return  # burada da bitiyor
+        await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢")
+        return
 
-    # Gündüz ve normal süreç
+    # Geriye kalan her şey ONAYLANMAYI beklesin (argo varsa gece – argo olsun/olmasın gündüz)
     mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
+    if gece and argo_var:
+        mesaj = f"""⚠️ *Gece Argo İçerik Tespit Edildi!*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
     butonlar = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
          InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
     ])
     await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
 
-    YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
     kanal_buton = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
     ])
