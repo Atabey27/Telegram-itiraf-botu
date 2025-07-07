@@ -117,7 +117,10 @@ async def itiraf_al(_, msg: Message):
         mesaj = f"""🌙 *Gece Otomatik Yayın*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
         await app.send_message(ONAY_KANALI, mesaj)
 
-        await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢")
+        kanal_buton = InlineKeyboardMarkup([
+    [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
+])
+await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢", reply_markup=kanal_buton)
         return
 
     mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
