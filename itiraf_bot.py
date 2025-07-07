@@ -129,8 +129,10 @@ async def itiraf_al(_, msg: Message):
     ])
 
     await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
-    kanal_buton = InlineKeyboardMarkup(
-    [[InlineKeyboardButton("📢 Yayın Kanalına Git", url=f"https://t.me/c/{str(itirafchannel)[4:]}")]]
+kanal_buton = InlineKeyboardMarkup(
+    [[InlineKeyboardButton("📢 Yayın Kanalına Git", url=f"https://t.me/c/{str(YAYIN_KANALI)[4:]}")]]
+)
+await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
 )
 
 await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
