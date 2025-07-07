@@ -149,8 +149,8 @@ async def itiraf_al(_, msg: Message):
 {bilgi}"""
             await app.send_message(ONAY_KANALI, mesaj)
 
-            await msg.reply("✅ *İtirafın başarıyla yayınlandı!* 📢", quote=True)
-    else:
+            await msg.reply("✅ *İtirafın başarıyla yayınlandı!İtiraf etmeye devam edebilirsin.* 📢", quote=True)
+    return:
         mesaj = f"""📩 *Yeni İtiraf*
 ━━━━━━━━━━━━━━━
 📝 {text}
@@ -170,7 +170,7 @@ async def itiraf_al(_, msg: Message):
         kanal_buton = InlineKeyboardMarkup([
             [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
         ])
-        await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
+        await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.İtiraf etmeye devam edebilirsin.", reply_markup=kanal_buton)
     
 @app.on_message(filters.command("help"))
 async def help(_, msg: Message):
