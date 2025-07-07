@@ -108,7 +108,7 @@ async def itiraf_al(_, msg: Message):
     kullanici_id = msg.from_user.id
     bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {kullanici_id}"
 
-    YAYIN_KANAL_LIifNKI = os.getenv("YAYIN_KANAL_LINKI")
+    YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
     
     if gece and not argo_var:
         yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
