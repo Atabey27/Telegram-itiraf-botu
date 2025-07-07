@@ -108,20 +108,20 @@ async def itiraf_al(_, msg: Message):
     kullanici_id = msg.from_user.id
     bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {kullanici_id}"
 
-    YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
-
+    YAYIN_KANAL_LIifNKI = os.getenv("YAYIN_KANAL_LINKI")
+    
     if gece and not argo_var:
-    yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
-    await app.send_message(YAYIN_KANALI, yayin)
+        yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
+        await app.send_message(YAYIN_KANALI, yayin)
 
-    mesaj = f"""🌙 *Gece Otomatik Yayın*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-    await app.send_message(ONAY_KANALI, mesaj)
+        mesaj = f"""🌙 *Gece Otomatik Yayın*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+        await app.send_message(ONAY_KANALI, mesaj)
 
-    kanal_buton = InlineKeyboardMarkup([
+        kanal_buton = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
     ])
-    await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢", reply_markup=kanal_buton)
-    return
+        await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢", reply_markup=kanal_buton)
+        return
 
     mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
 
