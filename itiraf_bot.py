@@ -129,14 +129,13 @@ async def itiraf_al(_, msg: Message):
     ])
 
     await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
-    
+
     YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
-
-kanal_buton = InlineKeyboardMarkup([
-    [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
-])
+    kanal_buton = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
+    ])
     await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
-
+    
 @app.on_message(filters.command("help"))
 async def help(_, msg: Message):
     metin = """
