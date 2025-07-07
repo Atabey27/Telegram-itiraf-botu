@@ -84,7 +84,12 @@ async def help(_, msg: Message):
     await msg.reply(metin, quote=True)
 
 @app.on_message(filters.text & ~filters.command(["start"]))
+@app.on_message(filters.text & ~filters.command(["start"]))
 async def itiraf_al(_, msg: Message):
+    from datetime import time as dtime
+    now = datetime.now().time()
+    gece = dtime(0, 0) <= now <= dtime(7, 0)
+
     uid = msg.from_user.id if msg.from_user else msg.sender_chat.id
     if uid not in user_state or user_state[uid].get("state") != "yaz":
         return
@@ -96,10 +101,7 @@ async def itiraf_al(_, msg: Message):
     sehir = user_state[uid]["sehir"]
     etiket = user_state[uid]["etiket"]
     text = msg.text.strip()
-
-    if icerik_uyarisi(text):
-        await msg.reply("⚠️ İtirafında argo içerik algılandı. Bu nedenle reddedilebilir olabilir.")
-
+    argo_var = icerik_uyarisi(text)
     itiraf_id = yeni_itiraf_ekle(uid, text, sehir, etiket)
 
     if msg.from_user:
@@ -115,7 +117,41 @@ async def itiraf_al(_, msg: Message):
 
     bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {kullanici_id}"
 
-    mesaj = f"""📩 *Yeni İtiraf*
+    if gece:
+        if argo_var:
+            mesaj = f"""🌙 *Gece Gelen İtiraf*
+━━━━━━━━━━━━━━━
+📝 {text}
+━━━━━━━━━━━━━━━
+📍 *{sehir}* | 🪪 *{etiket}*
+🆔 *ID:* {itiraf_id}
+⚠️ Argo içerik algılandı!
+{bilgi}"""
+            butonlar = InlineKeyboardMarkup([
+                [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
+                 InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
+            ])
+            await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
+        else:
+            yayin = f"""📢 *Yeni İtiraf*
+━━━━━━━━━━━━━━━
+📝 {text}
+━━━━━━━━━━━━━━━
+📍 *{sehir}* | 🪪 *{etiket}*"""
+            await app.send_message(YAYIN_KANALI, yayin)
+
+            mesaj = f"""🌙 *Gece Otomatik Yayın*
+━━━━━━━━━━━━━━━
+📝 {text}
+━━━━━━━━━━━━━━━
+📍 *{sehir}* | 🪪 *{etiket}*
+🆔 *ID:* {itiraf_id}
+{bilgi}"""
+            await app.send_message(ONAY_KANALI, mesaj)
+
+            await msg.reply("✅ *İtirafın başarıyla yayınlandı!* 📢", quote=True)
+    else:
+        mesaj = f"""📩 *Yeni İtiraf*
 ━━━━━━━━━━━━━━━
 📝 {text}
 ━━━━━━━━━━━━━━━
@@ -123,18 +159,18 @@ async def itiraf_al(_, msg: Message):
 🆔 *ID:* {itiraf_id}
 {bilgi}"""
 
-    butonlar = InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
-         InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
-    ])
+        butonlar = InlineKeyboardMarkup([
+            [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
+             InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
+        ])
 
-    await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
+        await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
 
-    YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
-    kanal_buton = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
-    ])
-    await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
+        YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
+        kanal_buton = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
+        ])
+        await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
     
 @app.on_message(filters.command("help"))
 async def help(_, msg: Message):
