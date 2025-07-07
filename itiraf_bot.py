@@ -13,6 +13,7 @@ API_HASH = os.getenv("API_HASH")
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ONAY_KANALI = os.getenv("ONAY_KANALI_ID")
 YAYIN_KANALI = os.getenv("YAYIN_KANALI_ID")
+YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
 ADMINS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
 
 app = Client("itiraf_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
@@ -41,6 +42,7 @@ SEHIRLER = txt_dosyadan_liste("sehirler.txt")
 ETIKETLER = ["Aşk", "Gizlilik", "Aldatma", "Macera", "İş Yeri"]
 
 user_state = {}
+limit = 3  # Başlangıç limiti
 
 def icerik_uyarisi(text):
     return any(k in text.lower() for k in CINSIYEL_KELIMELER)
@@ -62,14 +64,29 @@ def grupla(liste, n):
 
 @app.on_message(filters.command("start"))
 async def start(_, msg: Message):
-    buttons = []
-    for grup in grupla(SEHIRLER, 3):
-        row = [InlineKeyboardButton(f"🌏 {s}", callback_data=f"sehir_{s}") for s in grup]
-        buttons.append(row)
+    uid = msg.from_user.id
+    user_state[uid] = {"state": "sehir_page", "sayfa": 0}
+    await sehir_sayfasi_gonder(msg, 0)
 
-    await msg.reply("📍 Hangi şehirden yazıyorsun?", reply_markup=InlineKeyboardMarkup(buttons))
-    uid = msg.from_user.id if msg.from_user else msg.sender_chat.id
-    user_state[uid] = {"state": "sehir"}
+async def sehir_sayfasi_gonder(msg, sayfa):
+    uid = msg.from_user.id
+    gruplar = grupla(SEHIRLER, 12)
+    if sayfa < 0 or sayfa >= len(gruplar):
+        return
+
+    butonlar = grupla(gruplar[sayfa], 3)
+    klavye = [[InlineKeyboardButton(f"🌍 {s}", callback_data=f"sehir_{s}")] for s in gruplar[sayfa]]
+
+    nav = []
+    if sayfa > 0:
+        nav.append(InlineKeyboardButton("◀️ Geri", callback_data=f"sayfa_{sayfa - 1}"))
+    if sayfa < len(gruplar) - 1:
+        nav.append(InlineKeyboardButton("▶️ İleri", callback_data=f"sayfa_{sayfa + 1}"))
+
+    if nav:
+        klavye.append(nav)
+
+    await msg.reply("📍 Hangi şehirden yazıyorsun?", reply_markup=InlineKeyboardMarkup(klavye))
 
 @app.on_message(filters.command("help"))
 async def help(_, msg: Message):
@@ -82,20 +99,30 @@ async def help(_, msg: Message):
 `/limitayarla 5` → Günlük limit 5 olur.
 """
     await msg.reply(metin, quote=True)
-    
-from datetime import time as dtime, datetime, timedelta
 
-@app.on_message(filters.text & ~filters.command(["start"]))
+@app.on_message(filters.command("limitayarla") & filters.user(ADMINS))
+async def limit_ayarla(_, msg: Message):
+    global limit
+    try:
+        yeni_limit = int(msg.text.split()[1])
+        if yeni_limit <= 0:
+            raise ValueError
+        limit = yeni_limit
+        await msg.reply(f"✅ Günlük itiraf limiti {limit} olarak ayarlandı.")
+    except (IndexError, ValueError):
+        await msg.reply("❌ Doğru kullanım: /limitayarla <sayı>\nÖrn: /limitayarla 5")
+
+@app.on_message(filters.text & ~filters.command(["start", "help"]))
 async def itiraf_al(_, msg: Message):
-    now_tr = datetime.utcnow() + timedelta(hours=3)  # Türkiye saati
+    now_tr = datetime.utcnow() + timedelta(hours=3)
     gece = dtime(0, 0) <= now_tr.time() <= dtime(7, 0)
 
-    uid = msg.from_user.id if msg.from_user else msg.sender_chat.id
+    uid = msg.from_user.id
     if uid not in user_state or user_state[uid].get("state") != "yaz":
         return
 
-    if uid not in ADMINS and kullanici_itiraf_sayisi(uid) >= 3:
-        return await msg.reply("❌ Günde en fazla 3 itiraf gönderebilirsin.")
+    if uid not in ADMINS and kullanici_itiraf_sayisi(uid) >= limit:
+        return await msg.reply("❌ Günde en fazla {} itiraf gönderebilirsin.".format(limit))
 
     sehir = user_state[uid]["sehir"]
     etiket = user_state[uid]["etiket"]
@@ -108,8 +135,6 @@ async def itiraf_al(_, msg: Message):
     kullanici_id = msg.from_user.id
     bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {kullanici_id}"
 
-    YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
-    
     if gece and not argo_var:
         yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
         await app.send_message(YAYIN_KANALI, yayin)
@@ -118,13 +143,12 @@ async def itiraf_al(_, msg: Message):
         await app.send_message(ONAY_KANALI, mesaj)
 
         kanal_buton = InlineKeyboardMarkup([
-        [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
-    ])
+            [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
+        ])
         await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢", reply_markup=kanal_buton)
         return
 
     mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-
     if gece and argo_var:
         mesaj = f"""⚠️ *Gece Argo İçerik Tespit Edildi!*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
 
@@ -138,25 +162,20 @@ async def itiraf_al(_, msg: Message):
         [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
     ])
     await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
-    
-@app.on_message(filters.command("help"))
-async def help(_, msg: Message):
-    metin = """
-🛠️ *Yönetici Komutu*
-
-/limitayarla <sayi> – Kullanıcıların günlük itiraf gönderme limitini değiştirir.
-
-Örnek:
-`/limitayarla 5` → Günlük limit 5 olur.
-"""
-    await msg.reply(metin, quote=True)
 
 @app.on_callback_query()
 async def callback_handler(_, q: CallbackQuery):
     data = q.data
     uid = q.from_user.id
 
-    if data.startswith("sehir_"):
+    if data.startswith("sayfa_"):
+        sayfa = int(data.split("_")[1])
+        user_state[uid]["sayfa"] = sayfa
+        await q.message.delete()
+        msg = await app.get_messages(q.message.chat.id, q.message.id - 1)
+        await sehir_sayfasi_gonder(msg, sayfa)
+
+    elif data.startswith("sehir_"):
         sehir = data.replace("sehir_", "")
         user_state[uid] = {"state": "etiket", "sehir": sehir}
         etiket_butonu = []
@@ -185,7 +204,7 @@ async def callback_handler(_, q: CallbackQuery):
 ━━━━━━━━━━━━━━━
 📝 {text}
 ━━━━━━━━━━━━━━━
-📍 *{sehir}* |🪪 *{etiket}*"""
+📍 *{sehir}* | 🪪 *{etiket}*"""
             await app.send_message(YAYIN_KANALI, yayin)
             await q.message.delete()
             await q.answer("Yayınlandı ✅")
