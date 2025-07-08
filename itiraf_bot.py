@@ -102,7 +102,7 @@ async def tum_haklari_sifirla(_, msg: Message):
     conn.commit()
     await msg.reply("✅ Bugünkü tüm kullanıcı hakları sıfırlandı.")
 
-@app.on_message(filters.text & ~filters.command(["start"]))
+@app.on_message(filters.private & filters.text & ~filters.command(["start"]))
 async def itiraf_al(_, msg: Message):
     now_tr = datetime.utcnow() + timedelta(hours=3)
     gece = dtime(0, 0) <= now_tr.time() <= dtime(7, 0)
@@ -156,6 +156,48 @@ async def itiraf_al(_, msg: Message):
         [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
     ])
     await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
+
+@app.on_message(filters.group & filters.command("itiraf"))
+async def gruptan_itiraf_al(_, msg: Message):
+    now_tr = datetime.utcnow() + timedelta(hours=3)
+    gece = dtime(0, 0) <= now_tr.time() <= dtime(7, 0)
+
+    uid = msg.from_user.id
+    text = msg.text.split(" ", 1)[1] if len(msg.text.split()) > 1 else None
+    if not text:
+        return await msg.reply("❌ Doğru kullanım: /itiraf mesaj", quote=True)
+
+    if uid not in ADMINS and kullanici_itiraf_sayisi(uid) >= LIMIT:
+        return await msg.reply(f"❌ Günde en fazla {LIMIT} itiraf gönderebilirsin.", quote=True)
+
+    sehir = "Bilinmiyor"
+    etiket = "Genel"
+    argo_var = icerik_uyarisi(text)
+    itiraf_id = yeni_itiraf_ekle(uid, text, sehir, etiket)
+
+    ad_soyad = (msg.from_user.first_name or "") + (" " + msg.from_user.last_name if msg.from_user.last_name else "")
+    kullanici_adi = f"@{msg.from_user.username}" if msg.from_user.username else "(kullanıcı adı yok)"
+    bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {uid}"
+
+    mesaj = f"""📩 *Yeni İtiraf (Grup)*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
+    if gece and argo_var:
+        mesaj = f"""⚠️ *Gece Argo İçerik (Grup)*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
+    butonlar = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
+         InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
+    ])
+    await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
+
+    if gece and not argo_var:
+        yayin = f"""📢 *Yeni İtiraf (Grup)*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
+        await app.send_message(YAYIN_KANALI, yayin)
+
+    kanal_buton = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
+    ])
+    await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton, quote=True)
 
 @app.on_callback_query()
 async def callback_handler(_, q: CallbackQuery):
