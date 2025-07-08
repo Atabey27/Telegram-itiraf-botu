@@ -1,5 +1,4 @@
 import os
-import random
 import sqlite3
 from datetime import datetime, timedelta, time as dtime
 from pyrogram import Client, filters
@@ -15,6 +14,7 @@ ONAY_KANALI = os.getenv("ONAY_KANALI_ID")
 YAYIN_KANALI = os.getenv("YAYIN_KANALI_ID")
 YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
 ADMINS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
+LIMIT = 3  # varsayılan limit
 
 app = Client("itiraf_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -39,10 +39,16 @@ def txt_dosyadan_liste(dosya_adi):
 
 CINSIYEL_KELIMELER = txt_dosyadan_liste("argolar.txt")
 SEHIRLER = txt_dosyadan_liste("sehirler.txt")
-ETIKETLER = ["Aşk", "Gizlilik", "Aldatma", "Macera", "İş Yeri"]
+
+ETIKETLER = [
+    ("Aşk", "❤️"),
+    ("Gizlilik", "🕵️"),
+    ("Genel", "💬"),
+    ("Macera", "🌪️"),
+    ("İş Yeri", "🏢")
+]
 
 user_state = {}
-limit = 3  # Başlangıç limiti
 
 def icerik_uyarisi(text):
     return any(k in text.lower() for k in CINSIYEL_KELIMELER)
@@ -64,65 +70,62 @@ def grupla(liste, n):
 
 @app.on_message(filters.command("start"))
 async def start(_, msg: Message):
+    await msg.reply("📍 Hangi şehirden yazıyorsun? (örnek: İstanbul)")
     uid = msg.from_user.id
-    user_state[uid] = {"state": "sehir_page", "sayfa": 0}
-    await sehir_sayfasi_gonder(msg, 0)
-
-async def sehir_sayfasi_gonder(msg, sayfa):
-    uid = msg.from_user.id
-    gruplar = grupla(SEHIRLER, 12)
-    if sayfa < 0 or sayfa >= len(gruplar):
-        return
-
-    butonlar = grupla(gruplar[sayfa], 3)
-    klavye = [[InlineKeyboardButton(f"🌍 {s}", callback_data=f"sehir_{s}")] for s in gruplar[sayfa]]
-
-    nav = []
-    if sayfa > 0:
-        nav.append(InlineKeyboardButton("◀️ Geri", callback_data=f"sayfa_{sayfa - 1}"))
-    if sayfa < len(gruplar) - 1:
-        nav.append(InlineKeyboardButton("▶️ İleri", callback_data=f"sayfa_{sayfa + 1}"))
-
-    if nav:
-        klavye.append(nav)
-
-    await msg.reply("📍 Hangi şehirden yazıyorsun?", reply_markup=InlineKeyboardMarkup(klavye))
-
-@app.on_message(filters.command("help"))
-async def help(_, msg: Message):
-    metin = """
-🛠️ *Yönetici Komutu*
-
-/limitayarla <sayi> – Kullanıcıların günlük itiraf gönderme limitini değiştirir.
-
-Örnek:
-`/limitayarla 5` → Günlük limit 5 olur.
-"""
-    await msg.reply(metin, quote=True)
+    user_state[uid] = {"state": "sehir"}
 
 @app.on_message(filters.command("limitayarla") & filters.user(ADMINS))
 async def limit_ayarla(_, msg: Message):
-    global limit
+    global LIMIT
     try:
         yeni_limit = int(msg.text.split()[1])
-        if yeni_limit <= 0:
-            raise ValueError
-        limit = yeni_limit
-        await msg.reply(f"✅ Günlük itiraf limiti {limit} olarak ayarlandı.")
-    except (IndexError, ValueError):
-        await msg.reply("❌ Doğru kullanım: /limitayarla <sayı>\nÖrn: /limitayarla 5")
+        LIMIT = yeni_limit
+        await msg.reply(f"✅ Günlük itiraf limiti {LIMIT} olarak ayarlandı.")
+    except:
+        await msg.reply("❌ Kullanım: /limitayarla <sayi>")
 
-@app.on_message(filters.text & ~filters.command(["start", "help"]))
+@app.on_message(filters.command("hakkisifirla") & filters.user(ADMINS))
+async def hak_sifirla(_, msg: Message):
+    try:
+        uid = int(msg.text.split()[1])
+        bugun = datetime.now().strftime("%Y-%m-%d")
+        cur.execute("DELETE FROM itiraflar WHERE user_id = ? AND tarih = ?", (uid, bugun))
+        conn.commit()
+        await msg.reply(f"✅ {uid} kullanıcısının bugünkü hakları sıfırlandı.")
+    except:
+        await msg.reply("❌ Kullanım: /hakkisifirla <kullanici_id>")
+
+@app.on_message(filters.command("tumhaklarisifirla") & filters.user(ADMINS))
+async def toplu_hak_sifirla(_, msg: Message):
+    bugun = datetime.now().strftime("%Y-%m-%d")
+    cur.execute("DELETE FROM itiraflar WHERE tarih = ?", (bugun,))
+    conn.commit()
+    await msg.reply("✅ Bugünkü tüm kullanıcı hakları sıfırlandı.")
+
+@app.on_message(filters.text & ~filters.command(["start"]))
 async def itiraf_al(_, msg: Message):
     now_tr = datetime.utcnow() + timedelta(hours=3)
     gece = dtime(0, 0) <= now_tr.time() <= dtime(7, 0)
 
     uid = msg.from_user.id
-    if uid not in user_state or user_state[uid].get("state") != "yaz":
+    state = user_state.get(uid, {}).get("state")
+
+    if state == "sehir":
+        sehir = msg.text.strip().title()
+        if sehir not in SEHIRLER:
+            return await msg.reply("❌ Böyle bir şehir yok. Lütfen tekrar yaz (örnek: İstanbul)")
+        user_state[uid] = {"state": "etiket", "sehir": sehir}
+        etiket_butonu = []
+        for grup in grupla(ETIKETLER, 2):
+            row = [InlineKeyboardButton(f"{emoji} {etiket}", callback_data=f"etiket_{etiket}") for etiket, emoji in grup]
+            etiket_butonu.append(row)
+        return await msg.reply("🪪 Etiket seçin:", reply_markup=InlineKeyboardMarkup(etiket_butonu))
+
+    if state != "yaz":
         return
 
-    if uid not in ADMINS and kullanici_itiraf_sayisi(uid) >= limit:
-        return await msg.reply("❌ Günde en fazla {} itiraf gönderebilirsin.".format(limit))
+    if uid not in ADMINS and kullanici_itiraf_sayisi(uid) >= LIMIT:
+        return await msg.reply("❌ Günde en fazla {} itiraf gönderebilirsin.".format(LIMIT))
 
     sehir = user_state[uid]["sehir"]
     etiket = user_state[uid]["etiket"]
@@ -132,8 +135,7 @@ async def itiraf_al(_, msg: Message):
 
     ad_soyad = (msg.from_user.first_name or "") + (" " + msg.from_user.last_name if msg.from_user.last_name else "")
     kullanici_adi = f"@{msg.from_user.username}" if msg.from_user.username else "(kullanıcı adı yok)"
-    kullanici_id = msg.from_user.id
-    bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {kullanici_id}"
+    bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {uid}"
 
     if gece and not argo_var:
         yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
@@ -149,6 +151,7 @@ async def itiraf_al(_, msg: Message):
         return
 
     mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
     if gece and argo_var:
         mesaj = f"""⚠️ *Gece Argo İçerik Tespit Edildi!*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
 
@@ -168,24 +171,7 @@ async def callback_handler(_, q: CallbackQuery):
     data = q.data
     uid = q.from_user.id
 
-    if data.startswith("sayfa_"):
-        sayfa = int(data.split("_")[1])
-        user_state[uid]["sayfa"] = sayfa
-        await q.message.delete()
-        msg = await app.get_messages(q.message.chat.id, q.message.id - 1)
-        await sehir_sayfasi_gonder(msg, sayfa)
-
-    elif data.startswith("sehir_"):
-        sehir = data.replace("sehir_", "")
-        user_state[uid] = {"state": "etiket", "sehir": sehir}
-        etiket_butonu = []
-        for grup in grupla(ETIKETLER, 2):
-            row = [InlineKeyboardButton(f"🪪 {e}", callback_data=f"etiket_{e}") for e in grup]
-            etiket_butonu.append(row)
-
-        await q.message.edit_text("🪪 Etiket seçin:", reply_markup=InlineKeyboardMarkup(etiket_butonu))
-
-    elif data.startswith("etiket_"):
+    if data.startswith("etiket_"):
         etiket = data.replace("etiket_", "")
         if uid in user_state:
             user_state[uid]["etiket"] = etiket
@@ -200,11 +186,7 @@ async def callback_handler(_, q: CallbackQuery):
             text, sehir, etiket = row
             cur.execute("UPDATE itiraflar SET onayli = 1 WHERE id = ?", (id,))
             conn.commit()
-            yayin = f"""📢 *Yeni İtiraf*
-━━━━━━━━━━━━━━━
-📝 {text}
-━━━━━━━━━━━━━━━
-📍 *{sehir}* | 🪪 *{etiket}*"""
+            yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
             await app.send_message(YAYIN_KANALI, yayin)
             await q.message.delete()
             await q.answer("Yayınlandı ✅")
