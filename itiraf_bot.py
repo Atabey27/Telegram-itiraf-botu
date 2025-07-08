@@ -14,7 +14,7 @@ ONAY_KANALI = os.getenv("ONAY_KANALI_ID")
 YAYIN_KANALI = os.getenv("YAYIN_KANALI_ID")
 YAYIN_KANAL_LINKI = os.getenv("YAYIN_KANAL_LINKI")
 ADMINS = [int(x) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip().isdigit()]
-LIMIT = 3  # varsayılan limit
+LIMIT = 3
 
 app = Client("itiraf_bot", api_id=API_ID, api_hash=API_HASH, bot_token=BOT_TOKEN)
 
@@ -96,7 +96,7 @@ async def hak_sifirla(_, msg: Message):
         await msg.reply("❌ Kullanım: /hakkisifirla <kullanici_id>")
 
 @app.on_message(filters.command("tumhaklarisifirla") & filters.user(ADMINS))
-async def toplu_hak_sifirla(_, msg: Message):
+async def tum_haklari_sifirla(_, msg: Message):
     bugun = datetime.now().strftime("%Y-%m-%d")
     cur.execute("DELETE FROM itiraflar WHERE tarih = ?", (bugun,))
     conn.commit()
@@ -125,7 +125,7 @@ async def itiraf_al(_, msg: Message):
         return
 
     if uid not in ADMINS and kullanici_itiraf_sayisi(uid) >= LIMIT:
-        return await msg.reply("❌ Günde en fazla {} itiraf gönderebilirsin.".format(LIMIT))
+        return await msg.reply(f"❌ Günde en fazla {LIMIT} itiraf gönderebilirsin.")
 
     sehir = user_state[uid]["sehir"]
     etiket = user_state[uid]["etiket"]
@@ -137,66 +137,59 @@ async def itiraf_al(_, msg: Message):
     kullanici_adi = f"@{msg.from_user.username}" if msg.from_user.username else "(kullanıcı adı yok)"
     bilgi = f"👤 {ad_soyad}\n🔗 {kullanici_adi}\n🆔 {uid}"
 
+    mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
+    if gece and argo_var:
+        mesaj = f"""⚠️ *Gece Argo İçerik Tespit Edildi!*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
+
+    butonlar = InlineKeyboardMarkup([
+        [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
+         InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
+    ])
+    await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
+
     if gece and not argo_var:
         yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
         await app.send_message(YAYIN_KANALI, yayin)
 
-        mesaj = f"""🌙 *Gece Otomatik Yayın*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-        await app.send_message(ONAY_KANALI, mesaj)
+    kanal_buton = InlineKeyboardMarkup([
+        [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
+    ])
+    await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
 
-        kanal_buton = InlineKeyboardMarkup([
-            [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
-        ])
-        await msg.reply("✅ *İtirafın başarıyla yayınlandı! Devam edebilirsin.* 📢", reply_markup=kanal_buton)
-        return
-
-    mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-
-    if gece and argo_var:
-    mesaj = f"""⚠️ *Gece Argo İçerik Tespit Edildi!*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-else:
-    mesaj = f"""📩 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
-
-butonlar = InlineKeyboardMarkup([
-    [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
-     InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
-])
-await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
-
-kanal_buton = InlineKeyboardMarkup([
-    [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
-])
-await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
 @app.on_callback_query()
 async def callback_handler(_, q: CallbackQuery):
-    data = q.data
-    uid = q.from_user.id
+    try:
+        data = q.data
+        uid = q.from_user.id
 
-    if data.startswith("etiket_"):
-        etiket = data.replace("etiket_", "")
-        if uid in user_state:
-            user_state[uid]["etiket"] = etiket
-            user_state[uid]["state"] = "yaz"
-            await q.message.edit_text("🖍️ Şimdi itirafını yaz.")
+        if data.startswith("etiket_"):
+            etiket = data.replace("etiket_", "")
+            if uid in user_state:
+                user_state[uid]["etiket"] = etiket
+                user_state[uid]["state"] = "yaz"
+                await q.message.edit_text("🖍️ Şimdi itirafını yaz.")
 
-    elif data.startswith("onayla_"):
-        id = int(data.split("_")[1])
-        cur.execute("SELECT text, sehir, etiket FROM itiraflar WHERE id = ?", (id,))
-        row = cur.fetchone()
-        if row:
-            text, sehir, etiket = row
-            cur.execute("UPDATE itiraflar SET onayli = 1 WHERE id = ?", (id,))
+        elif data.startswith("onayla_"):
+            id = int(data.split("_")[1])
+            cur.execute("SELECT text, sehir, etiket FROM itiraflar WHERE id = ?", (id,))
+            row = cur.fetchone()
+            if row:
+                text, sehir, etiket = row
+                cur.execute("UPDATE itiraflar SET onayli = 1 WHERE id = ?", (id,))
+                conn.commit()
+                yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
+                await app.send_message(YAYIN_KANALI, yayin)
+                await q.message.delete()
+                await q.answer("✅ Yayınlandı")
+
+        elif data.startswith("reddet_"):
+            id = int(data.split("_")[1])
+            cur.execute("DELETE FROM itiraflar WHERE id = ?", (id,))
             conn.commit()
-            yayin = f"""📢 *Yeni İtiraf*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*"""
-            await app.send_message(YAYIN_KANALI, yayin)
             await q.message.delete()
-            await q.answer("Yayınlandı ✅")
-
-    elif data.startswith("reddet_"):
-        id = int(data.split("_")[1])
-        cur.execute("DELETE FROM itiraflar WHERE id = ?", (id,))
-        conn.commit()
-        await q.message.delete()
-        await q.answer("İtiraf reddedildi ❌")
+            await q.answer("❌ İtiraf reddedildi")
+    except Exception as e:
+        await q.answer(f"Hata: {e}", show_alert=True)
 
 app.run()
