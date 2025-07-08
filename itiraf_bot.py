@@ -155,16 +155,16 @@ async def itiraf_al(_, msg: Message):
     if gece and argo_var:
         mesaj = f"""⚠️ *Gece Argo İçerik Tespit Edildi!*\n━━━━━━━━━━━━━━━\n📝 {text}\n━━━━━━━━━━━━━━━\n📍 *{sehir}* | 🪪 *{etiket}*\n🆔 *ID:* {itiraf_id}\n{bilgi}"""
 
-    butonlar = InlineKeyboardMarkup([
+        butonlar = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Onayla", callback_data=f"onayla_{itiraf_id}"),
          InlineKeyboardButton("❌ Reddet", callback_data=f"reddet_{itiraf_id}")]
     ])
-    await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
+        await app.send_message(ONAY_KANALI, mesaj, reply_markup=butonlar)
 
-    kanal_buton = InlineKeyboardMarkup([
+        kanal_buton = InlineKeyboardMarkup([
         [InlineKeyboardButton("📢 Yayın Kanalına Git", url=YAYIN_KANAL_LINKI)]
     ])
-    await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
+        await msg.reply("✅ İtirafın gönderildi. Onaylanınca paylaşılacak.", reply_markup=kanal_buton)
 
 @app.on_callback_query()
 async def callback_handler(_, q: CallbackQuery):
