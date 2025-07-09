@@ -20,3 +20,5 @@ COPY itiraf.py .
 
 # Botu çalıştır
 CMD ["python", "itiraf.py"]
+
+RUN pip install --no-cache-dir -r requirements.txt
