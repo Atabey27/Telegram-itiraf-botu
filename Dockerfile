@@ -1,17 +1,22 @@
-# Python 3.12 slim imajını kullan
-FROM python:3.12-slim
+# Python 3.11 kullan
+FROM python:3.11-slim
 
-# Çalışma dizinini ayarla
+# Çalışma dizini oluştur ve ayarla
 WORKDIR /app
 
-# Kodları konteynıra kopyala
-COPY . .
+# Gereken sistem paketleri (sqlite için)
+RUN apt-get update && apt-get install -y gcc libsqlite3-dev && rm -rf /var/lib/apt/lists/*
 
-# Sisteme gcc ve build-essential kur (tgcrypto vs. için şart)
-RUN apt-get update && apt-get install -y gcc build-essential
+# Gereken python paketlerini kopyala ve yükle
+COPY requirements.txt .
 
-# Pip'i güncelle ve bağımlılıkları yükle
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Bot kodunu kopyala
+COPY itiraf.py .
+
+# .env dosyasını kopyala (build sırasında değil, runtime’da volume olarak kullanmak daha iyi)
+# COPY .env .
 
 # Botu çalıştır
-CMD ["python3", "itiraf_bot.py"]
+CMD ["python", "itiraf.py"]
