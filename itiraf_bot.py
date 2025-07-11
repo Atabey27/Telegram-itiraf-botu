@@ -324,6 +324,28 @@ async def duyuru_yayinla(_, msg):
         except Exception:
             hatali += 1
 
+    await msg.reply(f"✅ Gönderildi: {basarili}\n❌ Hata: {hatali}"@app.on_message(filters.command("duyuru") & filters.private)
+async def duyuru_yayinla(_, msg):
+    if msg.from_user.id not in ADMINS:
+        return await msg.reply("❌ Bu komut sadece adminler içindir.")
+
+    if len(msg.text.split(None, 1)) < 2:
+        return await msg.reply("⚠️ Kullanım: /duyuru mesajınız")
+
+    duyuru = msg.text.split(None, 1)[1]
+    basarili, hatali = 0, 0
+
+    cur.execute("SELECT DISTINCT kanal_username FROM kanallar")
+    kanallar = [row[0] for row in cur.fetchall()]
+
+    for kanal in kanallar:
+        try:
+            await app.send_message(kanal, f"📣 **DUYURU**\n\n{duyuru}")
+            basarili += 1
+        except Exception as e:
+            print(f"Hata ({kanal}): {e}")
+            hatali += 1
+
     await msg.reply(f"✅ Gönderildi: {basarili}\n❌ Hata: {hatali}")
 @app.on_message(filters.command("temizle") & filters.private)
 async def temizle_cmd(_, msg):
