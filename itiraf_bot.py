@@ -3,7 +3,8 @@ import sqlite3
 from datetime import datetime
 from dotenv import load_dotenv
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuer
+from pyrogram.errors import ChatAdminRequired, UserNotParticipant
 
 # .env yükle
 load_dotenv()
@@ -71,7 +72,37 @@ def format_user(user):
     name = f"{user.first_name or ''} {user.last_name or ''}".strip()
     uname = f"@{user.username}" if user.username else "Yok"
     return f"👤 {name}\n🆔 {user.id}\n📛 {uname}"
+async def get_kanal_ve_grup_listesi():
+    """
+    Botun üye olduğu kanal / grupları döndürür.
+    Admin olmadığı yerlere ❌ etiketi ekler.
+    """
+    kanal_listesi, grup_listesi = [], []
 
+    async for dialog in app.get_dialogs():
+        chat = dialog.chat
+        if chat.type not in ("channel", "group", "supergroup"):
+            continue
+
+        # bot admin mi?
+        try:
+            member = await app.get_chat_member(chat.id, "me")
+            bot_admin = member.status in ("administrator", "creator")
+        except (ChatAdminRequired, UserNotParticipant):
+            bot_admin = False
+        except Exception:
+            bot_admin = False
+
+        ad = f"{chat.title} ({chat.username or 'private'})"
+        if not bot_admin:
+            ad += " ❌ Bot admin değil"
+
+        if chat.type == "channel":
+            kanal_listesi.append(f"📢 {ad}")
+        else:
+            grup_listesi.append(f"👥 {ad}")
+
+    return kanal_listesi, grup_listesi
 @app.on_message(filters.command("start") & filters.private)
 async def start(_, msg):
     await msg.reply(
@@ -152,20 +183,89 @@ async def yanitla(_, msg):
     except Exception as e:
         await msg.reply(f"❌ Hata: {e}")
 
+# --- YENİ /istatistik (sayfalandırmalı) ---
+istat_sayfa = {}   # {user_id: {"k": 0, "g": 0}}
+
+def bol(liste, n=5):
+    return [liste[i:i+n] for i in range(0, len(liste), n)] or [["(Yok)"]]
+
 @app.on_message(filters.command("istatistik") & filters.private)
 async def istatistik(_, msg):
     if msg.from_user.id not in ADMINS:
         return await msg.reply("❌ Bu komut sadece adminler içindir.")
-    
+
+    # veritabanı sayıları
     cur.execute("SELECT COUNT(*) FROM itiraflar")
     toplam = cur.fetchone()[0]
-
     cur.execute("SELECT COUNT(DISTINCT user_id) FROM itiraflar")
     kullanici = cur.fetchone()[0]
 
+    # sohbetler
+    kanallar, gruplar = await get_kanal_ve_grup_listesi()
+    k_pages, g_pages = bol(kanallar), bol(gruplar)
+    istat_sayfa[msg.from_user.id] = {"k": 0, "g": 0}
+
     await msg.reply(
-        f"📊 Toplam itiraf sayısı: {toplam}\n"
-        f"👥 Katılan kullanıcı sayısı: {kullanici}"
+        _istat_metni(toplam, kullanici, k_pages, g_pages, msg.from_user.id),
+        reply_markup=_istat_kp(msg.from_user.id, k_pages, g_pages),
+        disable_web_page_preview=True
+    )
+
+def _istat_metni(toplam, kullanici, k_pages, g_pages, uid):
+    k_i = istat_sayfa[uid]["k"]
+    g_i = istat_sayfa[uid]["g"]
+    return (
+        f"📊 **İstatistikler**\n"
+        f"📝 İtiraf: **{toplam}**\n"
+        f"🙋 Kullanıcı: **{kullanici}**\n\n"
+        f"📢 **Kanallar** (Sayfa {k_i+1}/{len(k_pages)}):\n" +
+        "\n".join(k_pages[k_i]) + "\n\n" +
+        f"👥 **Gruplar** (Sayfa {g_i+1}/{len(g_pages)}):\n" +
+        "\n".join(g_pages[g_i])
+    )
+
+def _istat_kp(uid, k_pages, g_pages):
+    k_i, g_i = istat_sayfa[uid]["k"], istat_sayfa[uid]["g"]
+    rows = []
+
+    # kanal sayfaları
+    k_btn = []
+    if k_i > 0:
+        k_btn.append(InlineKeyboardButton("⬅️", callback_data=f"istat_k_{k_i-1}"))
+    if k_i+1 < len(k_pages):
+        k_btn.append(InlineKeyboardButton("➡️", callback_data=f"istat_k_{k_i+1}"))
+    if k_btn: rows.append(k_btn)
+
+    # grup sayfaları
+    g_btn = []
+    if g_i > 0:
+        g_btn.append(InlineKeyboardButton("⬅️", callback_data=f"istat_g_{g_i-1}"))
+    if g_i+1 < len(g_pages):
+        g_btn.append(InlineKeyboardButton("➡️", callback_data=f"istat_g_{g_i+1}"))
+    if g_btn: rows.append(g_btn)
+
+    return InlineKeyboardMarkup(rows) if rows else None
+
+@app.on_callback_query(filters.regex(r"^istat_(k|g)_(\d+)$"))
+async def istat_sayfa_degistir(_, q: CallbackQuery):
+    uid = q.from_user.id
+    if uid not in ADMINS:
+        return await q.answer("Yetkin yok", show_alert=True)
+
+    alan, yeni = q.matches[0].group(1), int(q.matches[0].group(2))
+    istat_sayfa[uid][alan] = yeni
+
+    # verileri tazele
+    cur.execute("SELECT COUNT(*) FROM itiraflar")
+    toplam = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(DISTINCT user_id) FROM itiraflar")
+    kullanici = cur.fetchone()[0]
+    kanallar, gruplar = await get_kanal_ve_grup_listesi()
+    k_pages, g_pages = bol(kanallar), bol(gruplar)
+
+    await q.message.edit_text(
+        _istat_metni(toplam, kullanici, k_pages, g_pages, uid),
+        reply_markup=_istat_kp(uid, k_pages, g_pages)
     )
 
 @app.on_message(filters.command("ban") & filters.private)
@@ -206,7 +306,30 @@ async def unbanla(_, msg):
             await msg.reply("❌ Bu komutu sadece adminler kullanabilir.")
     except Exception as e:
         await msg.reply(f"❌ Hata: {e}")
+@app.on_message(filters.command("duyuru") & filters.private)
+async def duyuru_yayinla(_, msg):
+    if msg.from_user.id not in ADMINS:
+        return await msg.reply("❌ Bu komut sadece adminler içindir.")
 
+    if len(msg.text.split(None, 1)) < 2:
+        return await msg.reply("⚠️ Kullanım: /duyuru mesajınız")
+
+    duyuru = msg.text.split(None, 1)[1]
+    basarili, hatali = 0, 0
+
+    async for dialog in app.get_dialogs():
+        chat = dialog.chat
+        if chat.type not in ("channel", "group", "supergroup"):
+            continue
+        try:
+            me = await app.get_chat_member(chat.id, "me")
+            if me.status in ("administrator", "creator"):
+                await app.send_message(chat.id, f"📣 **DUYURU**\n\n{duyuru}")
+                basarili += 1
+        except Exception:
+            hatali += 1
+
+    await msg.reply(f"✅ Gönderildi: {basarili}\n❌ Hata: {hatali}")
 @app.on_message(filters.command("temizle") & filters.private)
 async def temizle_cmd(_, msg):
     if msg.from_user.id not in ADMINS:
