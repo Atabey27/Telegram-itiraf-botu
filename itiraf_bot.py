@@ -73,34 +73,29 @@ def format_user(user):
     uname = f"@{user.username}" if user.username else "Yok"
     return f"👤 {name}\n🆔 {user.id}\n📛 {uname}"
 async def get_kanal_ve_grup_listesi():
-    """
-    Botun üye olduğu kanal / grupları döndürür.
-    Admin olmadığı yerlere ❌ etiketi ekler.
-    """
-    kanal_listesi, grup_listesi = [], []
+    cur.execute("SELECT DISTINCT kanal_username FROM kanallar")
+    rows = cur.fetchall()
 
-    async for dialog in app.get_dialogs():
-        chat = dialog.chat
-        if chat.type not in ("channel", "group", "supergroup"):
-            continue
+    kanal_listesi = []
+    grup_listesi = []  # İleride grup da eklemek istersen
 
-        # bot admin mi?
+    for row in rows:
+        username = row[0]
+        ad = username
+
         try:
+            chat = await app.get_chat(username)
             member = await app.get_chat_member(chat.id, "me")
             bot_admin = member.status in ("administrator", "creator")
-        except (ChatAdminRequired, UserNotParticipant):
-            bot_admin = False
-        except Exception:
-            bot_admin = False
+            if not bot_admin:
+                ad += " ❌ Bot admin değil"
+        except Exception as e:
+            ad += f" ⚠️ Erişim yok"
 
-        ad = f"{chat.title} ({chat.username or 'private'})"
-        if not bot_admin:
-            ad += " ❌ Bot admin değil"
-
-        if chat.type == "channel":
+        if username.startswith("@"):
             kanal_listesi.append(f"📢 {ad}")
         else:
-            grup_listesi.append(f"👥 {ad}")
+            grup_listesi.append(f"👥 {ad}")  # Eğer grup eklersen buraya girer
 
     return kanal_listesi, grup_listesi
 @app.on_message(filters.command("start") & filters.private)
