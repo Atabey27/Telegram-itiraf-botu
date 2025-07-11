@@ -3,8 +3,7 @@ import sqlite3
 from datetime import datetime
 from dotenv import load_dotenv
 from pyrogram import Client, filters
-from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message
-from pyrogram.types.callbacks import CallbackQuery
+from pyrogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
 from pyrogram.errors import ChatAdminRequired, UserNotParticipant
 
 # .env yükle
