@@ -312,29 +312,6 @@ async def duyuru_yayinla(_, msg):
     duyuru = msg.text.split(None, 1)[1]
     basarili, hatali = 0, 0
 
-    async for dialog in app.get_dialogs():
-        chat = dialog.chat
-        if chat.type not in ("channel", "group", "supergroup"):
-            continue
-        try:
-            me = await app.get_chat_member(chat.id, "me")
-            if me.status in ("administrator", "creator"):
-                await app.send_message(chat.id, f"📣 **DUYURU**\n\n{duyuru}")
-                basarili += 1
-        except Exception:
-            hatali += 1
-
-    await msg.reply(f"✅ Gönderildi: {basarili}\n❌ Hata: {hatali}"@app.on_message(filters.command("duyuru") & filters.private)
-async def duyuru_yayinla(_, msg):
-    if msg.from_user.id not in ADMINS:
-        return await msg.reply("❌ Bu komut sadece adminler içindir.")
-
-    if len(msg.text.split(None, 1)) < 2:
-        return await msg.reply("⚠️ Kullanım: /duyuru mesajınız")
-
-    duyuru = msg.text.split(None, 1)[1]
-    basarili, hatali = 0, 0
-
     cur.execute("SELECT DISTINCT kanal_username FROM kanallar")
     kanallar = [row[0] for row in cur.fetchall()]
 
@@ -347,6 +324,7 @@ async def duyuru_yayinla(_, msg):
             hatali += 1
 
     await msg.reply(f"✅ Gönderildi: {basarili}\n❌ Hata: {hatali}")
+
 @app.on_message(filters.command("temizle") & filters.private)
 async def temizle_cmd(_, msg):
     if msg.from_user.id not in ADMINS:
